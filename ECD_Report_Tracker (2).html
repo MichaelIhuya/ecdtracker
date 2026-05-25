@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NMECD Report Submission Tracker | Tanzania</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+  // ── PASTE YOUR FIREBASE CONFIG HERE ──────────────────────────────────
+  const firebaseConfig = {
+    apiKey:            "YOUR_API_KEY",
+    authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL:       "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+    projectId:         "YOUR_PROJECT_ID",
+    storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId:             "YOUR_APP_ID"
+  };
+  // ─────────────────────────────────────────────────────────────────────
+
+  try {
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    window._fbSave = async function(key, value) {
+      await db.ref(key).set(value);
+    };
+    window._fbLoad = async function(key) {
+      const snap = await db.ref(key).get();
+      return snap.exists() ? snap.val() : null;
+    };
+    window._firebaseReady = true;
+    if (typeof window._onFirebaseReady === 'function') window._onFirebaseReady();
+  } catch(e) {
+    console.warn('Firebase init failed:', e);
+    window._firebaseReady = false;
+  }
+</script>
+
+</body>
+</html>

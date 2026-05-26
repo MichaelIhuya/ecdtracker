@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NMECD Report Submission Tracker | Tanzania</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+  // ── PASTE YOUR FIREBASE CONFIG HERE ──────────────────────────────────
+  const firebaseConfig = {
+    apiKey:            "YOUR_API_KEY",
+    authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL:       "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+    projectId:         "YOUR_PROJECT_ID",
+    storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId:             "YOUR_APP_ID"
+  };
+  // ─────────────────────────────────────────────────────────────────────
+
+  try {
+    firebase.initializeApp(firebaseConfig);
+    const _db = firebase.database();
+    window._fbSave = async function(key, value) { await _db.ref(key).set(value); };
+    window._fbLoad = async function(key) {
+      const snap = await _db.ref(key).get();
+      return snap.exists() ? snap.val() : null;
+    };
+    window._firebaseReady = true;
+    if (typeof window._onFirebaseReady === 'function') window._onFirebaseReady();
+  } catch(e) {
+    console.warn('Firebase init failed:', e);
+    window._firebaseReady = false;
+  }
+</script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;color:#1a202c;min-height:100vh}
+  :root{
+    --green:#16a34a;--green-bg:#dcfce7;--green-text:#14532d;
+    --red:#dc2626;--red-bg:#fee2e2;--red-text:#7f1d1d;
+    --blue:#1d4ed8;--blue-bg:#dbeafe;--blue-text:#1e3a8a;
+    --amber:#d97706;--amber-bg:#fef3c7;--amber-text:#78350f;
+    --gray:#6b7280;--border:#e2e8f0;--card:#fff;--header:#1e3a5f;
+  }
+  header{background:var(--header);color:#fff;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem}
+  header h1{font-size:1.1rem;font-weight:600;line-height:1.3}
+  header .badge{background:rgba(255,255,255,0.15);padding:4px 12px;border-radius:20px;font-size:12px}
+  .container{max-width:1280px;margin:0 auto;padding:1rem 1.25rem}
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:1.25rem}
+  .stat{background:var(--card);border:0.5px solid var(--border);border-radius:10px;padding:14px 16px;text-align:center}
+  .stat .value{font-size:1.75rem;font-weight:700;line-height:1.1}
+  .stat .label{font-size:11px;color:#6b7280;margin-top:4px;text-transform:uppercase;letter-spacing:.04em}
+  .stat.s-green .value{color:var(--green)}
+  .stat.s-red .value{color:var(--red)}
+  .stat.s-blue .value{color:var(--blue)}
+  .stat.s-amber .value{color:var(--amber)}
+  .section{background:var(--card);border:0.5px solid var(--border);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem}
+  .section-title{font-size:14px;font-weight:600;color:#374151;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1.25rem;align-items:center}
+  .controls input,.controls select{padding:8px 12px;border:0.5px solid var(--border);border-radius:7px;font-size:13px;background:#fff;color:#1a202c;outline:none;height:36px}
+  .controls input:focus,.controls select:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.15)}
+  .controls input{flex:1;min-width:180px}
+  .btn{padding:8px 16px;border-radius:7px;font-size:13px;cursor:pointer;border:none;font-weight:500;height:36px;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s}
+  .btn:hover{opacity:.85}
+  .btn-primary{background:var(--header);color:#fff}
+  .btn-success{background:var(--green);color:#fff}
+  .btn-outline{background:#fff;color:var(--header);border:0.5px solid var(--border)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:#f8fafc;padding:10px 12px;text-align:left;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;border-bottom:0.5px solid var(--border);position:sticky;top:0;z-index:1}
+  td{padding:10px 12px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#f8fafc}
+  .badge-status{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block;min-width:90px;text-align:center}
+  .badge-submitted{background:var(--green-bg);color:var(--green-text)}
+  .badge-not{background:var(--red-bg);color:var(--red-text)}
+  .type-badge{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;background:var(--blue-bg);color:var(--blue-text)}
+  select.status-select{border:0.5px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;background:#fff;width:130px}
+  .region-row{background:#f8fafc;font-weight:600;font-size:12px;color:#374151;cursor:pointer;user-select:none}
+  .region-row td:first-child{padding-left:8px}
+  .region-expand{font-size:10px;margin-right:6px;display:inline-block;transition:transform .2s;color:#6b7280}
+  .region-expand.open{transform:rotate(90deg)}
+  .council-row td:first-child{padding-left:28px}
+  .progress-wrap{width:100px;height:6px;background:#e2e8f0;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:6px}
+  .progress-bar{height:100%;border-radius:3px;transition:width .3s}
+  .chart-wrap{position:relative;width:100%;height:280px}
+  .save-btn{position:fixed;bottom:20px;right:20px;z-index:100;padding:12px 20px;background:var(--green);color:#fff;border:none;border-radius:30px;cursor:pointer;font-weight:600;font-size:14px;box-shadow:0 4px 16px rgba(22,163,74,.35);transition:transform .15s, opacity .15s}
+  .save-btn:hover{transform:translateY(-2px)}
+  .toast{position:fixed;bottom:70px;right:20px;background:#1a202c;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;z-index:200;pointer-events:none}
+  .toast.show{opacity:1}
+  .last-saved{font-size:11px;color:#9ca3af;margin-left:auto}
+  .period-label{font-size:12px;color:#6b7280}
+  .hidden{display:none}
+  @media(max-width:600px){
+    .stats-grid{grid-template-columns:1fr 1fr}
+    .controls{flex-direction:column}
+    .controls input,.controls select{width:100%}
+    th:nth-child(4),td:nth-child(4){display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>NMECD Programme — Report Submission Tracker</h1>
+    <div style="font-size:11px;opacity:.8;margin-top:3px">Tanzania Mainland | 26 Regions · 184 Councils | Reporting Period: Jan–March 2026</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <span class="badge" id="lastSaved">Not saved yet</span>
+    <button class="btn btn-outline" onclick="exportCSV()" style="font-size:12px;height:32px;padding:0 12px">⬇ Export CSV</button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="stats-grid" id="statsGrid"></div>
+
+  <div class="section">
+    <div class="section-title">📊 Submission rate by region</div>
+    <div class="chart-wrap">
+      <canvas id="regionChart" role="img" aria-label="Bar chart showing submission rates per region in Tanzania"></canvas>
+    </div>
+  </div>
+
+  <div class="controls">
+    <input type="text" id="searchBox" placeholder="🔍  Search council or region…" oninput="renderTable()">
+    <select id="filterRegion" onchange="renderTable()"><option value="">All regions</option></select>
+    <select id="filterStatus" onchange="renderTable()">
+      <option value="">All statuses</option>
+      <option value="SUBMITTED">Submitted</option>
+      <option value="NOT SUBMITTED">Not submitted</option>
+    </select>
+    <select id="filterType" onchange="renderTable()">
+      <option value="">All types</option>
+      <option value="CC">CC</option>
+      <option value="DC">DC</option>
+      <option value="MC">MC</option>
+      <option value="TC">TC</option>
+    </select>
+    <button class="btn btn-primary" onclick="collapseAll()">Collapse all</button>
+    <button class="btn btn-outline" onclick="expandAll()">Expand all</button>
+  </div>
+
+  <div class="section" style="padding:0;overflow:hidden">
+    <div style="overflow-x:auto">
+      <table id="mainTable">
+        <thead>
+          <tr>
+            <th style="width:36px">#</th>
+            <th>Region / Council</th>
+            <th>Type</th>
+            <th>Reporting period</th>
+            <th>Status</th>
+            <th>Update</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="font-size:11px;color:#9ca3af;text-align:center;padding:12px 0">
+    Source: TAMISEMI 2021 Official Register · TECDEN CARE Initiative MEL System
+  </div>
+</div>
+
+<button class="save-btn" onclick="saveData()">💾 Save changes</button>
+<div class="toast" id="toast"></div>
+
+<script>
+const COUNCILS_RAW = [
+  {id:1,region:"Arusha",council:"Arusha CC",type:"CC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:2,region:"Arusha",council:"Arusha DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:3,region:"Arusha",council:"Karatu DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:4,region:"Arusha",council:"Longido DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:5,region:"Arusha",council:"Meru DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:6,region:"Arusha",council:"Monduli DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:7,region:"Arusha",council:"Ngorongoro DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:8,region:"Dar es Salaam",council:"Ilala MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:9,region:"Dar es Salaam",council:"Kigamboni MC",type:"MC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:10,region:"Dar es Salaam",council:"Kinondoni MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:11,region:"Dar es Salaam",council:"Temeke MC",type:"MC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:12,region:"Dar es Salaam",council:"Ubungo MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:13,region:"Dodoma",council:"Bahi DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:14,region:"Dodoma",council:"Chamwino DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:15,region:"Dodoma",council:"Chemba DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:16,region:"Dodoma",council:"Dodoma CC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:17,region:"Dodoma",council:"Kondoa DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:18,region:"Dodoma",council:"Kondoa TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:19,region:"Dodoma",council:"Kongwa DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:20,region:"Dodoma",council:"Mpwapwa DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:21,region:"Geita",council:"Bukombe DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:22,region:"Geita",council:"Chato DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:23,region:"Geita",council:"Geita DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:24,region:"Geita",council:"Geita TC",type:"TC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:25,region:"Geita",council:"Mbogwe DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:26,region:"Geita",council:"Nyang'hwale DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:27,region:"Iringa",council:"Iringa DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:28,region:"Iringa",council:"Iringa MC",type:"MC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:29,region:"Iringa",council:"Kilolo DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:30,region:"Iringa",council:"Mafinga TC",type:"TC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:31,region:"Iringa",council:"Mufindi DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:32,region:"Kagera",council:"Biharamulo DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:33,region:"Kagera",council:"Bukoba DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:34,region:"Kagera",council:"Bukoba MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:35,region:"Kagera",council:"Karagwe DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:36,region:"Kagera",council:"Kyerwa DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:37,region:"Kagera",council:"Missenyi DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:38,region:"Kagera",council:"Muleba DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:39,region:"Kagera",council:"Ngara DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:40,region:"Katavi",council:"Mlele DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:41,region:"Katavi",council:"Nsimbo DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:42,region:"Katavi",council:"Tanganyika DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:43,region:"Katavi",council:"Mpimbwe DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:44,region:"Katavi",council:"Mpanda MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:45,region:"Kigoma",council:"Buhigwe DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:46,region:"Kigoma",council:"Kakonko DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:47,region:"Kigoma",council:"Kasulu DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:48,region:"Kigoma",council:"Kasulu TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:49,region:"Kigoma",council:"Kibondo DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:50,region:"Kigoma",council:"Kigoma DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:51,region:"Kigoma",council:"Kigoma-Ujiji MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:52,region:"Kigoma",council:"Uvinza DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:53,region:"Kilimanjaro",council:"Hai DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:54,region:"Kilimanjaro",council:"Moshi DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:55,region:"Kilimanjaro",council:"Moshi MC",type:"MC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:56,region:"Kilimanjaro",council:"Mwanga DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:57,region:"Kilimanjaro",council:"Rombo DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:58,region:"Kilimanjaro",council:"Same DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:59,region:"Kilimanjaro",council:"Siha DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:60,region:"Lindi",council:"Kilwa DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:61,region:"Lindi",council:"Lindi MC",type:"MC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:62,region:"Lindi",council:"Mtama DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:63,region:"Lindi",council:"Liwale DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:64,region:"Lindi",council:"Nachingwea DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:65,region:"Lindi",council:"Ruangwa DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:66,region:"Manyara",council:"Babati DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:67,region:"Manyara",council:"Babati TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:68,region:"Manyara",council:"Hanang DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:69,region:"Manyara",council:"Kiteto DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:70,region:"Manyara",council:"Mbulu DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:71,region:"Manyara",council:"Mbulu TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:72,region:"Manyara",council:"Simanjiro DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:73,region:"Mara",council:"Bunda DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:74,region:"Mara",council:"Bunda TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:75,region:"Mara",council:"Butiama DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:76,region:"Mara",council:"Musoma DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:77,region:"Mara",council:"Musoma MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:78,region:"Mara",council:"Rorya DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:79,region:"Mara",council:"Serengeti DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:80,region:"Mara",council:"Tarime DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:81,region:"Mara",council:"Tarime TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:82,region:"Mbeya",council:"Busokelo DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:83,region:"Mbeya",council:"Chunya DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:84,region:"Mbeya",council:"Kyela DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:85,region:"Mbeya",council:"Mbarali DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:86,region:"Mbeya",council:"Mbeya CC",type:"CC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:87,region:"Mbeya",council:"Mbeya DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:88,region:"Mbeya",council:"Rungwe DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:89,region:"Morogoro",council:"Gairo DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:90,region:"Morogoro",council:"Ifakara TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:91,region:"Morogoro",council:"Mlimba DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:92,region:"Morogoro",council:"Kilosa DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:93,region:"Morogoro",council:"Malinyi DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:94,region:"Morogoro",council:"Morogoro DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:95,region:"Morogoro",council:"Morogoro MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:96,region:"Morogoro",council:"Mvomero DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:97,region:"Morogoro",council:"Ulanga DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:98,region:"Mtwara",council:"Masasi DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:99,region:"Mtwara",council:"Masasi TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:100,region:"Mtwara",council:"Mtwara DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:101,region:"Mtwara",council:"Mtwara MC",type:"MC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:102,region:"Mtwara",council:"Nanyamba TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:103,region:"Mtwara",council:"Nanyumbu DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:104,region:"Mtwara",council:"Newala DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:105,region:"Mtwara",council:"Newala TC",type:"TC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:106,region:"Mtwara",council:"Tandahimba DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:107,region:"Mwanza",council:"Buchosa DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:108,region:"Mwanza",council:"Ilemela MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:109,region:"Mwanza",council:"Kwimba DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:110,region:"Mwanza",council:"Magu DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:111,region:"Mwanza",council:"Misungwi DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:112,region:"Mwanza",council:"Mwanza CC",type:"CC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:113,region:"Mwanza",council:"Sengerema DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:114,region:"Mwanza",council:"Ukerewe DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:115,region:"Njombe",council:"Ludewa DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:116,region:"Njombe",council:"Makambako TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:117,region:"Njombe",council:"Makete DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:118,region:"Njombe",council:"Njombe DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:119,region:"Njombe",council:"Njombe TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:120,region:"Njombe",council:"Wanging'ombe DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:121,region:"Pwani",council:"Bagamoyo DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:122,region:"Pwani",council:"Kibaha DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:123,region:"Pwani",council:"Kibaha TC",type:"TC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:124,region:"Pwani",council:"Kisarawe DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:125,region:"Pwani",council:"Mafia DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:126,region:"Pwani",council:"Mkuranga DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:127,region:"Pwani",council:"Chalinze DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:128,region:"Pwani",council:"Kibiti DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:129,region:"Pwani",council:"Rufiji DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:130,region:"Rukwa",council:"Kalambo DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:131,region:"Rukwa",council:"Nkasi DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:132,region:"Rukwa",council:"Sumbawanga DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:133,region:"Rukwa",council:"Sumbawanga MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:134,region:"Ruvuma",council:"Mbinga DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:135,region:"Ruvuma",council:"Mbinga TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:136,region:"Ruvuma",council:"Namtumbo DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:137,region:"Ruvuma",council:"Nyasa DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:138,region:"Ruvuma",council:"Songea DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:139,region:"Ruvuma",council:"Songea MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:140,region:"Ruvuma",council:"Tunduru DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:141,region:"Ruvuma",council:"Madaba DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:142,region:"Shinyanga",council:"Ushetu DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:143,region:"Shinyanga",council:"Kahama TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:144,region:"Shinyanga",council:"Kishapu DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:145,region:"Shinyanga",council:"Msalala DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:146,region:"Shinyanga",council:"Shinyanga DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:147,region:"Shinyanga",council:"Shinyanga MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:148,region:"Simiyu",council:"Bariadi DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:149,region:"Simiyu",council:"Bariadi TC",type:"TC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:150,region:"Simiyu",council:"Busega DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:151,region:"Simiyu",council:"Itilima DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:152,region:"Simiyu",council:"Maswa DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:153,region:"Simiyu",council:"Meatu DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:154,region:"Singida",council:"Ikungi DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:155,region:"Singida",council:"Iramba DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:156,region:"Singida",council:"Itigi TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:157,region:"Singida",council:"Manyoni DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:158,region:"Singida",council:"Mkalama DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:159,region:"Singida",council:"Singida DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:160,region:"Singida",council:"Singida MC",type:"MC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:161,region:"Songwe",council:"Ileje DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:162,region:"Songwe",council:"Mbozi DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:163,region:"Songwe",council:"Momba DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:164,region:"Songwe",council:"Songwe DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:165,region:"Songwe",council:"Tunduma TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:166,region:"Tabora",council:"Igunga DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:167,region:"Tabora",council:"Kaliua DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:168,region:"Tabora",council:"Nzega DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:169,region:"Tabora",council:"Nzega TC",type:"TC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:170,region:"Tabora",council:"Sikonge DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:171,region:"Tabora",council:"Tabora MC",type:"MC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:172,region:"Tabora",council:"Urambo DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:173,region:"Tabora",council:"Uyui DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:174,region:"Tanga",council:"Handeni DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:175,region:"Tanga",council:"Handeni TC",type:"TC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:176,region:"Tanga",council:"Kilindi DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:177,region:"Tanga",council:"Korogwe DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:178,region:"Tanga",council:"Korogwe TC",type:"TC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:179,region:"Tanga",council:"Lushoto DC",type:"DC",period:"Jan–March 2026",status:"SUBMITTED"},
+  {id:180,region:"Tanga",council:"Mkinga DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:181,region:"Tanga",council:"Muheza DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:182,region:"Tanga",council:"Pangani DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:183,region:"Tanga",council:"Bumbuli DC",type:"DC",period:"Jan–March 2026",status:"NOT SUBMITTED"},
+  {id:184,region:"Tanga",council:"Tanga CC",type:"CC",period:"Jan–March 2026",status:"NOT SUBMITTED"}
+];
+
+let data = [];
+let regionExpanded = {};
+let chart = null;
+
+const STORAGE_KEY = 'nmecd_tracker_jan_march_2026';
+
+function loadData() {
+  document.getElementById('tableBody').innerHTML =
+    '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#6b7280">⏳ Loading data…</td></tr>';
+
+  async function doLoad() {
+    try {
+      if (window._firebaseReady) {
+        const val = await window._fbLoad(STORAGE_KEY);
+        if (val) {
+          const parsed = Array.isArray(val) ? val : JSON.parse(val);
+          data = COUNCILS_RAW.map(c => {
+            const found = parsed.find(s => s.id === c.id);
+            return found ? {...c, status: found.status} : {...c};
+          });
+          showToast('Data loaded from Firebase ☁️');
+        } else {
+          data = COUNCILS_RAW.map(c => ({...c}));
+        }
+      } else {
+        // localStorage fallback
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          data = COUNCILS_RAW.map(c => {
+            const found = parsed.find(s => s.id === c.id);
+            return found ? {...c, status: found.status} : {...c};
+          });
+          showToast('Loaded from local storage ⚠️');
+        } else {
+          data = COUNCILS_RAW.map(c => ({...c}));
+        }
+      }
+    } catch(e) {
+      console.warn('Load failed, using defaults', e);
+      data = COUNCILS_RAW.map(c => ({...c}));
+      showToast('Load failed – using defaults ⚠️');
+    }
+    init();
+  }
+
+  if (window._firebaseReady) {
+    doLoad();
+  } else {
+    window._onFirebaseReady = doLoad;
+    setTimeout(() => { if (!window._firebaseReady) { window._firebaseReady = false; doLoad(); } }, 4000);
+  }
+}
+
+async function saveData() {
+  const btn = document.querySelector('.save-btn');
+  if (btn) { btn.textContent = '⏳ Saving…'; btn.disabled = true; }
+  try {
+    const toSave = data.map(c => ({id: c.id, status: c.status}));
+    if (window._firebaseReady) {
+      await window._fbSave(STORAGE_KEY, toSave);
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    const now = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    document.getElementById('lastSaved').textContent = '☁️ Saved ' + now;
+    showToast('Saved to Firebase ✅');
+  } catch(e) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data.map(c => ({id:c.id,status:c.status}))));
+      showToast('Firebase failed – saved locally ⚠️');
+    } catch(e2) { showToast('Save failed ⚠️'); }
+  } finally {
+    if (btn) { btn.textContent = '💾 Save changes'; btn.disabled = false; }
+  }
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function getRegionStats() {
+  const stats = {};
+  data.forEach(c => {
+    if (!stats[c.region]) stats[c.region] = {total:0,submitted:0};
+    stats[c.region].total++;
+    if (c.status === 'SUBMITTED') stats[c.region].submitted++;
+  });
+  return stats;
+}
+
+function updateStats() {
+  const total = data.length;
+  const submitted = data.filter(c => c.status === 'SUBMITTED').length;
+  const notSubmitted = total - submitted;
+  const regions = [...new Set(data.map(c => c.region))].length;
+  const pct = Math.round((submitted/total)*100);
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat s-blue"><div class="value">${total}</div><div class="label">Total councils</div></div>
+    <div class="stat s-green"><div class="value">${submitted}</div><div class="label">Submitted</div></div>
+    <div class="stat s-red"><div class="value">${notSubmitted}</div><div class="label">Not submitted</div></div>
+    <div class="stat s-blue"><div class="value">${regions}</div><div class="label">Regions</div></div>
+    <div class="stat s-amber"><div class="value">${pct}%</div><div class="label">Overall rate</div></div>
+  `;
+}
+
+function updateChart() {
+  const stats = getRegionStats();
+  const regions = Object.keys(stats).sort();
+  const rates = regions.map(r => Math.round((stats[r].submitted/stats[r].total)*100));
+  const colors = rates.map(r => r===100?'#16a34a':r>=75?'#22c55e':r>=50?'#f59e0b':r>=25?'#f97316':'#dc2626');
+
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById('regionChart'), {
+    type: 'bar',
+    data: {
+      labels: regions,
+      datasets: [{
+        label: 'Submission rate (%)',
+        data: rates,
+        backgroundColor: colors,
+        borderRadius: 5,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {display: false},
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const r = regions[ctx.dataIndex];
+              const s = stats[r];
+              return ` ${s.submitted}/${s.total} councils (${ctx.raw}%)`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {min:0,max:100,ticks:{callback:v=>v+'%',stepSize:25},grid:{color:'rgba(0,0,0,0.06)'}},
+        x: {ticks:{font:{size:10}},grid:{display:false}}
+      }
+    }
+  });
+}
+
+function populateFilters() {
+  const sel = document.getElementById('filterRegion');
+  const regions = [...new Set(data.map(c => c.region))].sort();
+  regions.forEach(r => {
+    const o = document.createElement('option');
+    o.value = r; o.textContent = r;
+    sel.appendChild(o);
+  });
+}
+
+function getFiltered() {
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  const rg = document.getElementById('filterRegion').value;
+  const st = document.getElementById('filterStatus').value;
+  const ty = document.getElementById('filterType').value;
+  return data.filter(c =>
+    (!q || c.council.toLowerCase().includes(q) || c.region.toLowerCase().includes(q)) &&
+    (!rg || c.region === rg) &&
+    (!st || c.status === st) &&
+    (!ty || c.type === ty)
+  );
+}
+
+function renderTable() {
+  const filtered = getFiltered();
+  const regionStats = getRegionStats();
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  const rg = document.getElementById('filterRegion').value;
+
+  const groupedByRegion = {};
+  filtered.forEach(c => {
+    if (!groupedByRegion[c.region]) groupedByRegion[c.region] = [];
+    groupedByRegion[c.region].push(c);
+  });
+
+  const regions = Object.keys(groupedByRegion).sort();
+  let rowNum = 0;
+  let html = '';
+
+  regions.forEach(region => {
+    const rs = regionStats[region];
+    const pct = Math.round((rs.submitted/rs.total)*100);
+    const color = pct===100?'#16a34a':pct>=75?'#22c55e':pct>=50?'#f59e0b':pct>=25?'#f97316':'#dc2626';
+    const isOpen = regionExpanded[region] !== false;
+    html += `<tr class="region-row" onclick="toggleRegion('${region.replace(/'/g,"\\'")}')">
+      <td colspan="6" style="padding:10px 12px">
+        <span class="region-expand ${isOpen?'open':''}" id="exp-${region.replace(/[^a-z0-9]/gi,'_')}">▶</span>
+        <strong>${region}</strong>
+        <span style="font-size:11px;color:#6b7280;margin-left:10px">${rs.submitted}/${rs.total} councils</span>
+        <span style="margin-left:10px;display:inline-flex;align-items:center;gap:6px">
+          <span class="progress-wrap"><span class="progress-bar" style="width:${pct}%;background:${color}"></span></span>
+          <span style="font-size:11px;font-weight:700;color:${color}">${pct}%</span>
+        </span>
+      </td>
+    </tr>`;
+
+    groupedByRegion[region].forEach(c => {
+      rowNum++;
+      const isSub = c.status === 'SUBMITTED';
+      html += `<tr class="council-row" style="${isOpen?'':'display:none'}" data-region="${c.region}">
+        <td style="color:#9ca3af;font-size:11px">${c.id}</td>
+        <td>${c.council}</td>
+        <td><span class="type-badge">${c.type}</span></td>
+        <td class="period-label">${c.period}</td>
+        <td><span class="badge-status ${isSub?'badge-submitted':'badge-not'}">${isSub?'✅ Submitted':'🔴 Not submitted'}</span></td>
+        <td>
+          <select class="status-select" onchange="updateStatus(${c.id}, this.value)">
+            <option value="SUBMITTED" ${isSub?'selected':''}>Submitted</option>
+            <option value="NOT SUBMITTED" ${!isSub?'selected':''}>Not submitted</option>
+          </select>
+        </td>
+      </tr>`;
+    });
+  });
+
+  document.getElementById('tableBody').innerHTML = html || '<tr><td colspan="6" style="text-align:center;padding:2rem;color:#9ca3af">No councils match your filters</td></tr>';
+}
+
+function toggleRegion(region) {
+  regionExpanded[region] = regionExpanded[region] === false ? true : false;
+  const key = region.replace(/[^a-z0-9]/gi,'_');
+  const rows = document.querySelectorAll(`[data-region="${region}"]`);
+  const arrow = document.getElementById('exp-' + key);
+  const isOpen = regionExpanded[region] !== false;
+  rows.forEach(r => r.style.display = isOpen ? '' : 'none');
+  if (arrow) arrow.classList.toggle('open', isOpen);
+}
+
+function collapseAll() {
+  const regions = [...new Set(data.map(c => c.region))];
+  regions.forEach(r => { regionExpanded[r] = false; });
+  renderTable();
+}
+
+function expandAll() {
+  const regions = [...new Set(data.map(c => c.region))];
+  regions.forEach(r => { regionExpanded[r] = true; });
+  renderTable();
+}
+
+function updateStatus(id, newStatus) {
+  const item = data.find(c => c.id === id);
+  if (item) {
+    item.status = newStatus;
+    updateStats();
+    updateChart();
+    renderTable();
+  }
+}
+
+function exportCSV() {
+  const headers = ['#','Region','Council','Type','Reporting Period','Status'];
+  const rows = data.map(c => [c.id,c.region,c.council,c.type,c.period,c.status]);
+  const csv = [headers,...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'NMECD_Submission_Tracker_Jan_March_2026.csv';
+  a.click();
+}
+
+function init() {
+  populateFilters();
+  updateStats();
+  updateChart();
+  renderTable();
+}
+
+loadData();
+</script>
+</body>
+</html>
